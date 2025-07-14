@@ -5,7 +5,7 @@ variable "resource_group_name" {
 
 variable "location" {
   type        = string
-  default     = "East US"
+  default     = "West India"
   description = "Azure region"
 }
 
@@ -14,7 +14,17 @@ variable "admin_username" {
   description = "Admin username for the VM"
 }
 
-variable "ssh_public_key_path" {
+variable "admin_password" {
   type        = string
-  description = "Path to your SSH public key"
+  description = "Password for the VM admin user"
+  sensitive   = true
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Tags to apply to all resources"
+  default = {
+    environment   = "devVm"
+    resource_type = "devVm"
+  }
 }
