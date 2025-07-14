@@ -1,9 +1,10 @@
-name: Deploy Windows 11 VM
+name: Deploy Windows 11 VM (via Terraform)
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -25,13 +26,18 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -var-file="terraform.tfvars"
+        run: terraform plan -var-file="azure-vm-deployment-Terraform/terraform.tfvars"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -var-file="terraform.tfvars"
+        run: terraform apply -auto-approve -var-file="azure-vm-deployment-Terraform/terraform.tfvars"
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           TF_VAR_admin_password: ${{ secrets.TF_VAR_admin_password }}
+
+      - name: Output VM IP Address
+        run: |
+          echo "VM IP Address:"
+          terraform output -raw public_ip_address || echo "No public IP address found"
