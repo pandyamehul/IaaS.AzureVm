@@ -1,6 +1,6 @@
 variable "resource_group_name" {
   type        = string
-  description = "Name of the resource group"
+  description = "mehul02-Learning-Azure"
 }
 
 variable "location" {
@@ -11,13 +11,7 @@ variable "location" {
 
 variable "admin_username" {
   type        = string
-  description = "Admin username for the VM"
-}
-
-variable "admin_password" {
-  type        = string
-  description = "Password for the VM admin user"
-  sensitive   = true
+  description = "vmadmin"
 }
 
 variable "tags" {

@@ -21,12 +21,15 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+        working-directory: azure-vm-deployment-Terraform
 
       - name: Terraform Validate
         run: terraform validate
+        working-directory: azure-vm-deployment-Terraform
 
       - name: Terraform Plan
         run: terraform plan -var-file="azure-vm-deployment-Terraform/terraform.tfvars"
+        working-directory: azure-vm-deployment-Terraform
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -var-file="azure-vm-deployment-Terraform/terraform.tfvars"
