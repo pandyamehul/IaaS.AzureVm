@@ -1,0 +1,259 @@
+name: Deploy Windows 11 VM (via ARM Templates)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Choose action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - destroy
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm resource deletion (only for destroy action)'
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy'
+    
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      RESOURCE_GROUP_NAME: "mehul02-Learning-Azure"
+      DEPLOYMENT_NAME: "vm-deployment-$(date +%Y%m%d%H%M%S)"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Validate ARM Template
+        run: |
+          echo "🔍 Validating ARM template..."
+          az deployment group validate \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --template-file azure-vm-deployment-Arm/azuredeploy.json \
+            --parameters azure-vm-deployment-Arm/azuredeploy.parameters.json \
+            --parameters adminPassword="${{ secrets.TF_VAR_ADMIN_PASSWORD }}"
+        working-directory: .
+
+      - name: Deploy ARM Template
+        run: |
+          echo "🚀 Deploying ARM template..."
+          DEPLOYMENT_NAME="vm-deployment-$(date +%Y%m%d%H%M%S)"
+          
+          az deployment group create \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $DEPLOYMENT_NAME \
+            --template-file azure-vm-deployment-Arm/azuredeploy.json \
+            --parameters azure-vm-deployment-Arm/azuredeploy.parameters.json \
+            --parameters adminPassword="${{ secrets.TF_VAR_ADMIN_PASSWORD }}" \
+            --verbose
+          
+          echo "DEPLOYMENT_NAME=$DEPLOYMENT_NAME" >> $GITHUB_ENV
+        working-directory: .
+
+      - name: Wait for VM to be fully running
+        run: |
+          echo "⏳ Waiting for VM to be fully running and IP to be assigned..."
+          sleep 60
+
+      - name: Get VM IP Address and Details
+        run: |
+          echo "🔍 Getting VM details..."
+          
+          # Get deployment outputs
+          VM_NAME=$(az deployment group show \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $DEPLOYMENT_NAME \
+            --query properties.outputs.vmName.value -o tsv)
+          
+          ADMIN_USERNAME=$(az deployment group show \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $DEPLOYMENT_NAME \
+            --query properties.outputs.adminUsername.value -o tsv)
+          
+          IP_METHOD=$(az deployment group show \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $DEPLOYMENT_NAME \
+            --query properties.outputs.publicIPAllocationMethod.value -o tsv)
+          
+          VM_STATE=$(az deployment group show \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $DEPLOYMENT_NAME \
+            --query properties.outputs.vmInitialState.value -o tsv)
+          
+          # Try to get public IP
+          PUBLIC_IP=$(az vm show -d \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $VM_NAME \
+            --query publicIps -o tsv 2>/dev/null || echo "")
+          
+          if [ -z "$PUBLIC_IP" ]; then
+            echo "⚠️  Public IP not yet assigned, checking public IP resource..."
+            PUBLIC_IP=$(az network public-ip show \
+              --resource-group $RESOURCE_GROUP_NAME \
+              --name "${VM_NAME}-public-ip" \
+              --query ipAddress -o tsv 2>/dev/null || echo "Not assigned")
+          fi
+          
+          if [ "$IP_METHOD" = "Dynamic" ] && [ "$PUBLIC_IP" = "Not assigned" ]; then
+            echo "💡 Note: Dynamic IP will be assigned when VM starts"
+            PUBLIC_IP="Will be assigned when VM starts"
+          fi
+          
+          echo "VM_NAME=$VM_NAME" >> $GITHUB_ENV
+          echo "ADMIN_USERNAME=$ADMIN_USERNAME" >> $GITHUB_ENV
+          echo "PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+          echo "IP_METHOD=$IP_METHOD" >> $GITHUB_ENV
+          echo "VM_STATE=$VM_STATE" >> $GITHUB_ENV
+
+      - name: Deallocate VM if configured
+        run: |
+          echo "🔍 Checking if VM should be deallocated..."
+          
+          # Check if VM should be stopped after creation
+          VM_START_AFTER_CREATION=$(az deployment group show \
+            --resource-group $RESOURCE_GROUP_NAME \
+            --name $DEPLOYMENT_NAME \
+            --query "properties.parameters.vmStartAfterCreation.value" -o tsv)
+          
+          if [ "$VM_START_AFTER_CREATION" = "false" ]; then
+            echo "🛑 Deallocating VM to save costs..."
+            az vm deallocate --resource-group $RESOURCE_GROUP_NAME --name $VM_NAME
+            echo "✅ VM deallocated successfully"
+          else
+            echo "▶️  VM will remain running as configured"
+          fi
+
+      - name: Output VM Details
+        run: |
+          echo "🎉 ARM Template Deployment Complete!"
+          echo "📋 VM Details:"
+          echo "  - VM Name: $VM_NAME"
+          echo "  - Resource Group: $RESOURCE_GROUP_NAME"
+          echo "  - Admin Username: $ADMIN_USERNAME"
+          echo "  - Public IP: $PUBLIC_IP"
+          echo "  - IP Allocation: $IP_METHOD"
+          echo "  - VM Initial State: $VM_STATE"
+          echo "  - Deployment Name: $DEPLOYMENT_NAME"
+          echo ""
+          echo "💰 VM is created in STOPPED state to save costs!"
+          
+          if [ "$IP_METHOD" = "Dynamic" ]; then
+            echo "💡 Dynamic IP: Only charged when VM is running (~$2.40/month when active)"
+            echo "🔌 Start VM to get IP: az vm start --resource-group $RESOURCE_GROUP_NAME --name $VM_NAME"
+          else
+            echo "💡 Static IP: Always charged (~$3.65/month) but IP is reserved"
+            echo "🔌 Start VM: az vm start --resource-group $RESOURCE_GROUP_NAME --name $VM_NAME"
+          fi
+          
+          echo "🛑 Stop VM to save costs: az vm deallocate --resource-group $RESOURCE_GROUP_NAME --name $VM_NAME"
+          echo "🔧 Use the 'Destroy' action to clean up all resources"
+
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      RESOURCE_GROUP_NAME: "mehul02-Learning-Azure"
+
+    steps:
+      - name: Validate destroy confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "❌ Destroy confirmation not provided. You must type 'DESTROY' to proceed."
+            exit 1
+          fi
+          echo "✅ Destroy confirmation validated"
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: List VM resources to be destroyed
+        run: |
+          echo "📋 VM resources that will be destroyed:"
+          
+          # List VMs
+          echo "🖥️  Virtual Machines:"
+          az vm list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].{Name:name, Size:hardwareProfile.vmSize, State:provisioningState}" -o table || echo "No VMs found"
+          
+          # List Network resources
+          echo "🌐 Network Resources:"
+          az network vnet list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].name" -o table || echo "No VNets found"
+          az network public-ip list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].{Name:name, IP:ipAddress, Method:publicIpAllocationMethod}" -o table || echo "No Public IPs found"
+          az network nsg list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].name" -o table || echo "No NSGs found"
+          
+          # List Disks
+          echo "💾 Disk Resources:"
+          az disk list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].{Name:name, Size:diskSizeGb, State:provisioningState}" -o table || echo "No disks found"
+
+      - name: Wait for final confirmation
+        run: |
+          echo "⏳ Waiting 30 seconds before destruction..."
+          echo "🚨 This will permanently delete all VM resources!"
+          sleep 30
+
+      - name: Delete VM and associated resources
+        run: |
+          echo "🗑️  Deleting VM resources..."
+          
+          # Find VM names that match our pattern
+          VM_NAMES=$(az vm list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].name" -o tsv)
+          
+          if [ -z "$VM_NAMES" ]; then
+            echo "⚠️  No VMs found matching pattern 'DevWin11Vm'"
+          else
+            for VM_NAME in $VM_NAMES; do
+              echo "🗑️  Deleting VM: $VM_NAME"
+              
+              # Delete the VM (this will also delete the OS disk by default)
+              az vm delete --resource-group $RESOURCE_GROUP_NAME --name $VM_NAME --yes --force-deletion yes
+              
+              # Delete associated resources
+              echo "🗑️  Deleting associated resources for $VM_NAME..."
+              
+              # Delete network interface
+              az network nic delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-nic" --no-wait || true
+              
+              # Delete public IP
+              az network public-ip delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-public-ip" --no-wait || true
+              
+              # Delete NSG
+              az network nsg delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-nsg" --no-wait || true
+              
+              # Delete VNet
+              az network vnet delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-vnet" --no-wait || true
+              
+              echo "✅ Deletion initiated for $VM_NAME"
+            done
+          fi
+
+      - name: Cleanup confirmation
+        run: |
+          echo "🎉 VM resources have been successfully deleted!"
+          echo "💰 This should help reduce your Azure costs."
+          echo "📊 Check your Azure portal to confirm all resources are deleted."
+          echo "⏳ Some resources may take a few minutes to fully delete."

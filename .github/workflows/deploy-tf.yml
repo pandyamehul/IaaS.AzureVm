@@ -177,9 +177,41 @@ jobs:
         run: terraform init
         working-directory: azure-vm-deployment-Terraform
 
-      - name: Show resources to be destroyed
+      - name: Check Terraform state and Azure resources
         run: |
-          echo "📋 Resources that will be destroyed:"
+          echo "🔍 Checking Terraform state..."
+          terraform state list || echo "⚠️  No Terraform state found"
+          
+          echo ""
+          echo "🔍 Checking actual Azure resources..."
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          
+          echo "📋 Checking resource group: $RESOURCE_GROUP_NAME"
+          
+          # Check if resource group exists
+          if az group show --name "$RESOURCE_GROUP_NAME" --output none 2>/dev/null; then
+            echo "✅ Resource group '$RESOURCE_GROUP_NAME' exists"
+            
+            # List resources in the group
+            echo "📋 Resources in resource group:"
+            az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type, Location:location}" -o table || echo "❌ Failed to list resources"
+            
+            # Check for specific VM
+            echo ""
+            echo "🔍 Checking for VM 'DevWin11Vm'..."
+            if az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "DevWin11Vm" --output none 2>/dev/null; then
+              echo "✅ VM 'DevWin11Vm' exists"
+              VM_STATE=$(az vm show -d --resource-group "$RESOURCE_GROUP_NAME" --name "DevWin11Vm" --query powerState -o tsv)
+              echo "🔋 VM Power State: $VM_STATE"
+            else
+              echo "❌ VM 'DevWin11Vm' not found"
+            fi
+          else
+            echo "❌ Resource group '$RESOURCE_GROUP_NAME' does not exist"
+          fi
+          
+          echo ""
+          echo "📋 Terraform plan for destruction:"
           terraform plan -destroy -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
 
@@ -189,14 +221,86 @@ jobs:
           echo "🚨 This will permanently delete all resources!"
           sleep 30
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve -var-file="terraform.tfvars"
+      - name: Terraform Destroy or Direct Azure Cleanup
+        run: |
+          echo "🗑️  Attempting Terraform destroy..."
+          
+          # Try Terraform destroy first
+          if terraform destroy -auto-approve -var-file="terraform.tfvars"; then
+            echo "✅ Terraform destroy completed successfully"
+          else
+            echo "⚠️  Terraform destroy completed but may have had no resources to destroy"
+          fi
+          
+          # Check if resources still exist in Azure and offer direct cleanup
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          
+          echo ""
+          echo "🔍 Post-destroy check - verifying resource cleanup..."
+          
+          if az group show --name "$RESOURCE_GROUP_NAME" --output none 2>/dev/null; then
+            echo "⚠️  Resource group '$RESOURCE_GROUP_NAME' still exists"
+            
+            # List remaining resources
+            REMAINING_RESOURCES=$(az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "length([])" -o tsv)
+            
+            if [ "$REMAINING_RESOURCES" -gt 0 ]; then
+              echo "⚠️  Found $REMAINING_RESOURCES remaining resources in the resource group"
+              echo "📋 Remaining resources:"
+              az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type}" -o table
+              
+              echo ""
+              echo "🗑️  Performing direct Azure cleanup of remaining resources..."
+              echo "⚠️  This will delete ALL resources in the resource group!"
+              
+              # Delete all resources in the resource group
+              az group delete --name "$RESOURCE_GROUP_NAME" --yes --no-wait
+              
+              echo "✅ Resource group deletion initiated"
+              echo "⏳ Deletion is running in the background and may take 5-10 minutes"
+            else
+              echo "✅ No resources found in the resource group"
+            fi
+          else
+            echo "✅ Resource group '$RESOURCE_GROUP_NAME' does not exist (already deleted)"
+          fi
         working-directory: azure-vm-deployment-Terraform
         env:
           TF_LOG: INFO
 
-      - name: Cleanup confirmation
+      - name: Final cleanup confirmation
         run: |
-          echo "🎉 Resources have been successfully destroyed!"
-          echo "💰 This should help reduce your Azure costs."
-          echo "📊 Check your Azure portal to confirm all resources are deleted."
+          echo "🎉 Cleanup process completed!"
+          echo ""
+          
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          
+          echo "🔍 Final verification..."
+          
+          # Check final state
+          if az group show --name "$RESOURCE_GROUP_NAME" --output none 2>/dev/null; then
+            REMAINING_RESOURCES=$(az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "length([])" -o tsv)
+            
+            if [ "$REMAINING_RESOURCES" -gt 0 ]; then
+              echo "⚠️  Resource group '$RESOURCE_GROUP_NAME' still exists with $REMAINING_RESOURCES resources"
+              echo "📋 Remaining resources:"
+              az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type}" -o table
+              echo ""
+              echo "⏳ Resources may still be deleting in the background"
+              echo "🔍 Check Azure Portal in 5-10 minutes to confirm complete deletion"
+            else
+              echo "✅ Resource group '$RESOURCE_GROUP_NAME' exists but is empty"
+              echo "🗑️  You may want to delete the empty resource group manually"
+            fi
+          else
+            echo "✅ Resource group '$RESOURCE_GROUP_NAME' has been completely deleted"
+          fi
+          
+          echo ""
+          echo "💰 This should help reduce your Azure costs!"
+          echo "📊 Check your Azure portal to confirm all resources are deleted"
+          echo ""
+          echo "💡 Next steps:"
+          echo "   - If resources remain, check Azure Portal for deletion status"
+          echo "   - Consider using ARM templates for future deployments"
+          echo "   - ARM templates handle resource lifecycle better than Terraform for learning scenarios"

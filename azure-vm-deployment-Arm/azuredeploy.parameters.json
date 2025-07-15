@@ -1,0 +1,30 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "value": "DevWin11Vm"
+        },
+        "adminUsername": {
+            "value": "vmadmin"
+        },
+        "vmSize": {
+            "value": "Standard_B2ms"
+        },
+        "location": {
+            "value": "West India"
+        },
+        "publicIPAllocationMethod": {
+            "value": "Dynamic"
+        },
+        "vmStartAfterCreation": {
+            "value": false
+        },
+        "tags": {
+            "value": {
+                "environment": "Development",
+                "resource_type": "devVm"
+            }
+        }
+    }
+}

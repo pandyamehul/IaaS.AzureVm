@@ -1,0 +1,36 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "description": "This template provides VM power state information"
+    },
+    "parameters": {
+        "vmName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the virtual machine"
+            }
+        },
+        "vmStartAfterCreation": {
+            "type": "bool",
+            "defaultValue": false,
+            "metadata": {
+                "description": "Whether to start the VM after creation"
+            }
+        }
+    },
+    "variables": {
+        "vmPowerState": "[if(parameters('vmStartAfterCreation'), 'running', 'deallocated')]"
+    },
+    "resources": [],
+    "outputs": {
+        "vmPowerState": {
+            "type": "string",
+            "value": "[variables('vmPowerState')]"
+        },
+        "deallocateCommand": {
+            "type": "string",
+            "value": "[concat('az vm deallocate --resource-group ', resourceGroup().name, ' --name ', parameters('vmName'))]"
+        }
+    }
+}
