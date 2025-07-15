@@ -238,7 +238,7 @@
         },
         "publicIPAddress": {
             "type": "string",
-            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))).ipAddress]"
+            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))).properties.ipAddress]"
         },
         "publicIPAllocationMethod": {
             "type": "string",
