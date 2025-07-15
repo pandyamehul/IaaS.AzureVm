@@ -1,8 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM Azure ARM Template Cleanup Script for Windows
-REM This script removes all resources created by the ARM template
+REM Azure VM Cleanup Script for Windows
+REM This script removes only the VM and its associated resources (not the entire resource group)
 
 echo.
 echo 🗑️  Azure VM Cleanup Script
@@ -10,6 +10,7 @@ echo.
 
 REM Configuration
 set RESOURCE_GROUP_NAME=mehul02-Learning-Azure
+set VM_NAME=DevWin11Vm
 
 REM Check if Azure CLI is installed
 az version >nul 2>&1
@@ -34,13 +35,30 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Show resources in the group
-echo 📋 Resources in resource group '%RESOURCE_GROUP_NAME%':
-az resource list --resource-group "%RESOURCE_GROUP_NAME%" --query "[].{Name:name, Type:type, Location:location}" -o table
-
+REM Show VM-specific resources to be deleted
+echo 📋 VM-specific resources to be deleted:
 echo.
-echo ⚠️  WARNING: This will DELETE ALL resources in the resource group!
-echo 🗑️  Resource Group: %RESOURCE_GROUP_NAME%
+echo   Resource Group: %RESOURCE_GROUP_NAME%
+echo   VM Name: %VM_NAME%
+echo.
+echo   Resources that will be deleted:
+echo   - Virtual Machine: %VM_NAME%
+echo   - Network Interface: %VM_NAME%-nic
+echo   - Public IP: %VM_NAME%-public-ip
+echo   - Network Security Group: %VM_NAME%-nsg
+echo   - Virtual Network: %VM_NAME%-vnet
+echo.
+
+REM Check if VM exists
+az vm show --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ❌ VM '%VM_NAME%' does not exist in resource group '%RESOURCE_GROUP_NAME%'
+    pause
+    exit /b 1
+)
+
+echo ⚠️  WARNING: This will delete the VM and its associated networking resources!
+echo ⚠️  Other resources in the resource group will NOT be affected.
 echo.
 set /p CONFIRM=Are you sure you want to continue? (yes/no): 
 
@@ -51,25 +69,64 @@ if not "%CONFIRM%"=="yes" (
 )
 
 echo.
-echo 🗑️  Deleting resource group '%RESOURCE_GROUP_NAME%'...
-echo ⏳ This may take several minutes...
+echo 🗑️  Deleting VM and associated resources...
+echo.
 
-az group delete --name "%RESOURCE_GROUP_NAME%" --yes --no-wait
-
+REM Delete VM first
+echo 🖥️  Deleting Virtual Machine '%VM_NAME%'...
+az vm delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%" --yes
 if %errorlevel% neq 0 (
-    echo ❌ Failed to initiate resource group deletion
-    pause
-    exit /b 1
+    echo ❌ Failed to delete VM
+) else (
+    echo ✅ VM deleted successfully
+)
+
+REM Delete Network Interface
+echo 🔌 Deleting Network Interface '%VM_NAME%-nic'...
+az network nic delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-nic" --yes
+if %errorlevel% neq 0 (
+    echo ❌ Failed to delete Network Interface
+) else (
+    echo ✅ Network Interface deleted successfully
+)
+
+REM Delete Public IP
+echo 🌐 Deleting Public IP '%VM_NAME%-public-ip'...
+az network public-ip delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-public-ip" --yes
+if %errorlevel% neq 0 (
+    echo ❌ Failed to delete Public IP
+) else (
+    echo ✅ Public IP deleted successfully
+)
+
+REM Delete Network Security Group
+echo 🔒 Deleting Network Security Group '%VM_NAME%-nsg'...
+az network nsg delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-nsg" --yes
+if %errorlevel% neq 0 (
+    echo ❌ Failed to delete Network Security Group
+) else (
+    echo ✅ Network Security Group deleted successfully
+)
+
+REM Delete Virtual Network
+echo 🌐 Deleting Virtual Network '%VM_NAME%-vnet'...
+az network vnet delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-vnet" --yes
+if %errorlevel% neq 0 (
+    echo ❌ Failed to delete Virtual Network
+) else (
+    echo ✅ Virtual Network deleted successfully
 )
 
 echo.
-echo ✅ Resource group deletion initiated!
-echo 📝 Note: Deletion is running in the background and may take 5-10 minutes to complete.
+echo 🎉 VM cleanup completed!
 echo.
-echo 🔍 To check deletion status, run:
-echo    az group show --name "%RESOURCE_GROUP_NAME%" --query properties.provisioningState -o tsv
+echo 🔍 Checking remaining resources in resource group...
+az resource list --resource-group "%RESOURCE_GROUP_NAME%" --query "[].{Name:name, Type:type}" -o table
+
 echo.
-echo 💡 When complete, the command above will return an error (group not found).
+echo � This should help reduce your Azure costs!
+echo 📊 Check your Azure portal to confirm the VM resources are deleted
+echo 💡 The resource group '%RESOURCE_GROUP_NAME%' still exists with any other resources
 echo.
 
 pause

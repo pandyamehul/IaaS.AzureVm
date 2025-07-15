@@ -112,40 +112,44 @@ jobs:
             echo "⚠️  Terraform destroy completed but may have had no resources to destroy"
           fi
           
-          # Check if resources still exist in Azure and offer direct cleanup
-          RESOURCE_GROUP_NAME="${{ github.event.inputs.resource_group_name }}"
-          if [ -z "$RESOURCE_GROUP_NAME" ]; then
-            RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
-          fi
+          # Check if VM-specific resources still exist and perform targeted cleanup
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          VM_NAME="DevWin11Vm"
           
           echo ""
-          echo "🔍 Post-destroy check - verifying resource cleanup..."
+          echo "🔍 Post-destroy check - verifying VM-specific resource cleanup..."
           
           if az group show --name "$RESOURCE_GROUP_NAME" --output none 2>/dev/null; then
-            echo "⚠️  Resource group '$RESOURCE_GROUP_NAME' still exists"
+            echo "✅ Resource group '$RESOURCE_GROUP_NAME' exists"
             
-            # List remaining resources
-            REMAINING_RESOURCES=$(az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "length([])" -o tsv)
+            # Check for VM-specific resources
+            VM_EXISTS=$(az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --output none 2>/dev/null && echo "true" || echo "false")
             
-            if [ "$REMAINING_RESOURCES" -gt 0 ]; then
-              echo "⚠️  Found $REMAINING_RESOURCES remaining resources in the resource group"
-              echo "📋 Remaining resources:"
-              az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type}" -o table
+            if [ "$VM_EXISTS" = "true" ]; then
+              echo "⚠️  VM '$VM_NAME' still exists, performing targeted cleanup..."
               
-              echo ""
-              echo "🗑️  Performing direct Azure cleanup of remaining resources..."
-              echo "⚠️  This will delete ALL resources in the resource group!"
+              # Delete VM and associated resources in proper order
+              echo "�️  Deleting Virtual Machine '$VM_NAME'..."
+              az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes || echo "⚠️  VM deletion failed"
               
-              # Delete all resources in the resource group
-              az group delete --name "$RESOURCE_GROUP_NAME" --yes --no-wait
+              echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
+              az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" --yes || echo "⚠️  NIC deletion failed"
               
-              echo "✅ Resource group deletion initiated"
-              echo "⏳ Deletion is running in the background and may take 5-10 minutes"
+              echo "🌐 Deleting Public IP '$VM_NAME-public-ip'..."
+              az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" --yes || echo "⚠️  Public IP deletion failed"
+              
+              echo "🔒 Deleting Network Security Group '$VM_NAME-nsg'..."
+              az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" --yes || echo "⚠️  NSG deletion failed"
+              
+              echo "🌐 Deleting Virtual Network '$VM_NAME-vnet'..."
+              az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" --yes || echo "⚠️  VNet deletion failed"
+              
+              echo "✅ VM-specific resource cleanup completed"
             else
-              echo "✅ No resources found in the resource group"
+              echo "✅ VM '$VM_NAME' not found (already deleted)"
             fi
           else
-            echo "✅ Resource group '$RESOURCE_GROUP_NAME' does not exist (already deleted)"
+            echo "❌ Resource group '$RESOURCE_GROUP_NAME' does not exist"
           fi
         working-directory: azure-vm-deployment-Terraform
         env:
@@ -153,40 +157,33 @@ jobs:
 
       - name: Final cleanup confirmation
         run: |
-          echo "🎉 Cleanup process completed!"
+          echo "🎉 VM cleanup process completed!"
           echo ""
           
-          RESOURCE_GROUP_NAME="${{ github.event.inputs.resource_group_name }}"
-          if [ -z "$RESOURCE_GROUP_NAME" ]; then
-            RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
-          fi
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          VM_NAME="DevWin11Vm"
           
           echo "🔍 Final verification..."
           
-          # Check final state
-          if az group show --name "$RESOURCE_GROUP_NAME" --output none 2>/dev/null; then
-            REMAINING_RESOURCES=$(az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "length([])" -o tsv)
-            
-            if [ "$REMAINING_RESOURCES" -gt 0 ]; then
-              echo "⚠️  Resource group '$RESOURCE_GROUP_NAME' still exists with $REMAINING_RESOURCES resources"
-              echo "📋 Remaining resources:"
-              az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type}" -o table
-              echo ""
-              echo "⏳ Resources may still be deleting in the background"
-              echo "🔍 Check Azure Portal in 5-10 minutes to confirm complete deletion"
-            else
-              echo "✅ Resource group '$RESOURCE_GROUP_NAME' exists but is empty"
-              echo "🗑️  You may want to delete the empty resource group manually"
-            fi
+          # Check if VM still exists
+          if az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --output none 2>/dev/null; then
+            echo "⚠️  VM '$VM_NAME' still exists in resource group '$RESOURCE_GROUP_NAME'"
+            echo "🔍 Check Azure Portal for deletion status"
           else
-            echo "✅ Resource group '$RESOURCE_GROUP_NAME' has been completely deleted"
+            echo "✅ VM '$VM_NAME' has been successfully deleted"
           fi
           
+          # Show remaining resources in the resource group
           echo ""
-          echo "💰 This should help reduce your Azure costs!"
-          echo "📊 Check your Azure portal to confirm all resources are deleted"
+          echo "📋 Remaining resources in resource group '$RESOURCE_GROUP_NAME':"
+          az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type}" -o table || echo "No resources found or resource group doesn't exist"
+          
+          echo ""
+          echo "� This should help reduce your Azure costs!"
+          echo "📊 VM-specific resources have been targeted for deletion"
+          echo "� The resource group and other resources remain untouched"
           echo ""
           echo "💡 Next steps:"
-          echo "   - If resources remain, check Azure Portal for deletion status"
+          echo "   - If VM resources remain, check Azure Portal for deletion status"
           echo "   - Consider using ARM templates for future deployments"
           echo "   - ARM templates handle resource lifecycle better than Terraform for learning scenarios"

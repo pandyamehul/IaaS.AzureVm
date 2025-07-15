@@ -213,47 +213,92 @@ jobs:
       - name: Wait for final confirmation
         run: |
           echo "⏳ Waiting 30 seconds before destruction..."
-          echo "🚨 This will permanently delete all VM resources!"
+          echo "🚨 This will permanently delete VM-specific resources only!"
+          echo "💡 The resource group and other resources will remain untouched"
+          echo ""
+          echo "📋 Resources to be deleted:"
+          echo "  - VM: DevWin11Vm"
+          echo "  - Network Interface: DevWin11Vm-nic"
+          echo "  - Public IP: DevWin11Vm-public-ip"
+          echo "  - Network Security Group: DevWin11Vm-nsg"
+          echo "  - Virtual Network: DevWin11Vm-vnet"
+          echo "  - OS Disk: (deleted automatically with VM)"
+          echo ""
           sleep 30
 
       - name: Delete VM and associated resources
         run: |
-          echo "🗑️  Deleting VM resources..."
+          echo "🗑️  Deleting VM-specific resources..."
           
-          # Find VM names that match our pattern
-          VM_NAMES=$(az vm list --resource-group $RESOURCE_GROUP_NAME --query "[?contains(name, 'DevWin11Vm')].name" -o tsv)
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          VM_NAME="DevWin11Vm"
           
-          if [ -z "$VM_NAMES" ]; then
-            echo "⚠️  No VMs found matching pattern 'DevWin11Vm'"
+          # Check if VM exists
+          if az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --output none 2>/dev/null; then
+            echo "✅ VM '$VM_NAME' found, proceeding with deletion..."
+            
+            # Delete VM and associated resources in proper order
+            echo "🖥️  Deleting Virtual Machine '$VM_NAME'..."
+            az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes --force-deletion yes || echo "⚠️  VM deletion failed"
+            
+            echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
+            az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" --yes || echo "⚠️  NIC deletion failed or not found"
+            
+            echo "🌐 Deleting Public IP '$VM_NAME-public-ip'..."
+            az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" --yes || echo "⚠️  Public IP deletion failed or not found"
+            
+            echo "🔒 Deleting Network Security Group '$VM_NAME-nsg'..."
+            az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" --yes || echo "⚠️  NSG deletion failed or not found"
+            
+            echo "🌐 Deleting Virtual Network '$VM_NAME-vnet'..."
+            az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" --yes || echo "⚠️  VNet deletion failed or not found"
+            
+            echo "✅ VM-specific resource cleanup completed"
           else
-            for VM_NAME in $VM_NAMES; do
-              echo "🗑️  Deleting VM: $VM_NAME"
-              
-              # Delete the VM (this will also delete the OS disk by default)
-              az vm delete --resource-group $RESOURCE_GROUP_NAME --name $VM_NAME --yes --force-deletion yes
-              
-              # Delete associated resources
-              echo "🗑️  Deleting associated resources for $VM_NAME..."
-              
-              # Delete network interface
-              az network nic delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-nic" --no-wait || true
-              
-              # Delete public IP
-              az network public-ip delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-public-ip" --no-wait || true
-              
-              # Delete NSG
-              az network nsg delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-nsg" --no-wait || true
-              
-              # Delete VNet
-              az network vnet delete --resource-group $RESOURCE_GROUP_NAME --name "${VM_NAME}-vnet" --no-wait || true
-              
-              echo "✅ Deletion initiated for $VM_NAME"
-            done
+            echo "❌ VM '$VM_NAME' not found in resource group '$RESOURCE_GROUP_NAME'"
+            echo "� Checking for any related resources to clean up..."
+            
+            # Try to clean up any orphaned resources
+            echo "🔌 Checking for orphaned Network Interface..."
+            az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" --yes || echo "⚠️  NIC not found or deletion failed"
+            
+            echo "🌐 Checking for orphaned Public IP..."
+            az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" --yes || echo "⚠️  Public IP not found or deletion failed"
+            
+            echo "🔒 Checking for orphaned Network Security Group..."
+            az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" --yes || echo "⚠️  NSG not found or deletion failed"
+            
+            echo "🌐 Checking for orphaned Virtual Network..."
+            az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" --yes || echo "⚠️  VNet not found or deletion failed"
           fi
 
-      - name: Cleanup confirmation
+      - name: Final cleanup confirmation
         run: |
-          echo "🎉 VM resources have been successfully deleted!"
-          echo "💰 This should help reduce your Azure costs."
-          echo "📊 Check your Azure portal to confirm all resources are deleted."
+          echo "🎉 VM cleanup process completed!"
+          echo ""
+          
+          RESOURCE_GROUP_NAME="mehul02-Learning-Azure"
+          VM_NAME="DevWin11Vm"
+          
+          echo "🔍 Final verification..."
+          
+          # Check if VM still exists
+          if az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --output none 2>/dev/null; then
+            echo "⚠️  VM '$VM_NAME' still exists in resource group '$RESOURCE_GROUP_NAME'"
+            echo "🔍 Check Azure Portal for deletion status"
+          else
+            echo "✅ VM '$VM_NAME' has been successfully deleted"
+          fi
+          
+          # Show remaining resources in the resource group
+          echo ""
+          echo "📋 Remaining resources in resource group '$RESOURCE_GROUP_NAME':"
+          az resource list --resource-group "$RESOURCE_GROUP_NAME" --query "[].{Name:name, Type:type}" -o table || echo "No resources found or resource group doesn't exist"
+          
+          echo ""
+          echo "💰 This should help reduce your Azure costs!"
+          echo "📊 VM-specific resources have been targeted for deletion"
+          echo "💡 The resource group '$RESOURCE_GROUP_NAME' and other resources remain untouched"
+          echo ""
           echo "⏳ Some resources may take a few minutes to fully delete."
+          echo "🔍 Check your Azure portal to confirm all VM resources are deleted."
