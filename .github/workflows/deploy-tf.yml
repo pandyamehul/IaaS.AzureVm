@@ -10,6 +10,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}
+      TF_LOG: DEBUG
 
     steps:
       - name: Checkout code
@@ -44,15 +52,9 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
-        env:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}
-          TF_LOG: DEBUG
 
       - name: Output VM IP Address
         run: |
           echo "VM IP Address:"
           terraform output -raw public_ip_address || echo "No public IP address found"
+        working-directory: azure-vm-deployment-Terraform
