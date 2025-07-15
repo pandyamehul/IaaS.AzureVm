@@ -83,7 +83,7 @@ if %errorlevel% neq 0 (
 
 REM Delete Network Interface
 echo 🔌 Deleting Network Interface '%VM_NAME%-nic'...
-az network nic delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-nic" --yes
+az network nic delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-nic"
 if %errorlevel% neq 0 (
     echo ❌ Failed to delete Network Interface
 ) else (
@@ -92,7 +92,7 @@ if %errorlevel% neq 0 (
 
 REM Delete Public IP
 echo 🌐 Deleting Public IP '%VM_NAME%-public-ip'...
-az network public-ip delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-public-ip" --yes
+az network public-ip delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-public-ip"
 if %errorlevel% neq 0 (
     echo ❌ Failed to delete Public IP
 ) else (
@@ -101,7 +101,7 @@ if %errorlevel% neq 0 (
 
 REM Delete Network Security Group
 echo 🔒 Deleting Network Security Group '%VM_NAME%-nsg'...
-az network nsg delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-nsg" --yes
+az network nsg delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-nsg"
 if %errorlevel% neq 0 (
     echo ❌ Failed to delete Network Security Group
 ) else (
@@ -110,7 +110,7 @@ if %errorlevel% neq 0 (
 
 REM Delete Virtual Network
 echo 🌐 Deleting Virtual Network '%VM_NAME%-vnet'...
-az network vnet delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-vnet" --yes
+az network vnet delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-vnet"
 if %errorlevel% neq 0 (
     echo ❌ Failed to delete Virtual Network
 ) else (

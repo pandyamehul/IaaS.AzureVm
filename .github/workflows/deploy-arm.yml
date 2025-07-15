@@ -242,16 +242,16 @@ jobs:
             az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes --force-deletion yes || echo "⚠️  VM deletion failed"
             
             echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
-            az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" --yes || echo "⚠️  NIC deletion failed or not found"
+            az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" || echo "⚠️  NIC deletion failed or not found"
             
             echo "🌐 Deleting Public IP '$VM_NAME-public-ip'..."
-            az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" --yes || echo "⚠️  Public IP deletion failed or not found"
+            az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" || echo "⚠️  Public IP deletion failed or not found"
             
             echo "🔒 Deleting Network Security Group '$VM_NAME-nsg'..."
-            az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" --yes || echo "⚠️  NSG deletion failed or not found"
+            az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" || echo "⚠️  NSG deletion failed or not found"
             
             echo "🌐 Deleting Virtual Network '$VM_NAME-vnet'..."
-            az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" --yes || echo "⚠️  VNet deletion failed or not found"
+            az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" || echo "⚠️  VNet deletion failed or not found"
             
             echo "✅ VM-specific resource cleanup completed"
           else
@@ -260,16 +260,16 @@ jobs:
             
             # Try to clean up any orphaned resources
             echo "🔌 Checking for orphaned Network Interface..."
-            az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" --yes || echo "⚠️  NIC not found or deletion failed"
+            az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" || echo "⚠️  NIC not found or deletion failed"
             
             echo "🌐 Checking for orphaned Public IP..."
-            az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" --yes || echo "⚠️  Public IP not found or deletion failed"
+            az network public-ip delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-public-ip" || echo "⚠️  Public IP not found or deletion failed"
             
             echo "🔒 Checking for orphaned Network Security Group..."
-            az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" --yes || echo "⚠️  NSG not found or deletion failed"
+            az network nsg delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nsg" || echo "⚠️  NSG not found or deletion failed"
             
             echo "🌐 Checking for orphaned Virtual Network..."
-            az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" --yes || echo "⚠️  VNet not found or deletion failed"
+            az network vnet delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-vnet" || echo "⚠️  VNet not found or deletion failed"
           fi
 
       - name: Final cleanup confirmation
