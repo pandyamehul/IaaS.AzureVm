@@ -222,7 +222,7 @@ jobs:
           echo "  - Public IP: DevWin11Vm-public-ip"
           echo "  - Network Security Group: DevWin11Vm-nsg"
           echo "  - Virtual Network: DevWin11Vm-vnet"
-          echo "  - OS Disk: (deleted automatically with VM)"
+          echo "  - OS Disk: $VM_NAME-os-disk"
           echo ""
           sleep 30
 
@@ -241,7 +241,10 @@ jobs:
             echo "🖥️  Deleting Virtual Machine '$VM_NAME'..."
             az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes --force-deletion yes || echo "⚠️  VM deletion failed"
             
-            echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
+            echo "� Deleting OS Disk '$VM_NAME-os-disk'..."
+            az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-os-disk" --yes || echo "⚠️  OS Disk deletion failed or not found"
+            
+            echo "�🔌 Deleting Network Interface '$VM_NAME-nic'..."
             az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" || echo "⚠️  NIC deletion failed or not found"
             
             echo "🌐 Deleting Public IP '$VM_NAME-public-ip'..."

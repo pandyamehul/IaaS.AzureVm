@@ -43,6 +43,7 @@ echo   VM Name: %VM_NAME%
 echo.
 echo   Resources that will be deleted:
 echo   - Virtual Machine: %VM_NAME%
+echo   - OS Disk: %VM_NAME%-os-disk
 echo   - Network Interface: %VM_NAME%-nic
 echo   - Public IP: %VM_NAME%-public-ip
 echo   - Network Security Group: %VM_NAME%-nsg
@@ -79,6 +80,15 @@ if %errorlevel% neq 0 (
     echo ❌ Failed to delete VM
 ) else (
     echo ✅ VM deleted successfully
+)
+
+REM Delete OS Disk
+echo 💽 Deleting OS Disk '%VM_NAME%-os-disk'...
+az disk delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-os-disk" --yes
+if %errorlevel% neq 0 (
+    echo ❌ Failed to delete OS Disk
+) else (
+    echo ✅ OS Disk deleted successfully
 )
 
 REM Delete Network Interface
