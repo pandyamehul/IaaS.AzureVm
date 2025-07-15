@@ -16,8 +16,7 @@ jobs:
       ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}
-      TF_LOG: DEBUG
+      TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}      
 
     steps:
       - name: Checkout code
@@ -52,6 +51,8 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
+        env:
+          TF_LOG: DEBUG
 
       - name: Output VM IP Address
         run: |
