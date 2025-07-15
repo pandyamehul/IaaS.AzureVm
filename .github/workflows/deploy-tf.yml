@@ -28,11 +28,12 @@ jobs:
         working-directory: azure-vm-deployment-Terraform
 
       - name: Terraform Plan
-        run: terraform plan -var-file="azure-vm-deployment-Terraform/terraform.tfvars"
+        run: terraform plan -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -var-file="azure-vm-deployment-Terraform/terraform.tfvars"
+        run: terraform apply -auto-approve -var-file="terraform.tfvars"
+        working-directory: azure-vm-deployment-Terraform
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
