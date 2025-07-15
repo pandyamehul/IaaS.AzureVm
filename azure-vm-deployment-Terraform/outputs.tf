@@ -16,7 +16,13 @@ output "vm_initial_state" {
 }
 
 output "public_ip_address" {
-  value = azurerm_public_ip.public_ip.ip_address
+  value = data.azurerm_public_ip.vm_public_ip.ip_address
+  description = "The actual public IP address assigned to the VM"
+}
+
+output "public_ip_address_allocation" {
+  value = azurerm_public_ip.public_ip.allocation_method
+  description = "The allocation method for the public IP address"
 }
 
 output "admin_username" {

@@ -21,6 +21,16 @@ variable "vm_start_after_creation" {
   default     = false
 }
 
+variable "public_ip_allocation_method" {
+  type        = string
+  description = "Allocation method for the public IP address (Static or Dynamic)"
+  default     = "Dynamic"
+  validation {
+    condition = contains(["Static", "Dynamic"], var.public_ip_allocation_method)
+    error_message = "The public_ip_allocation_method must be either 'Static' or 'Dynamic'."
+  }
+}
+
 variable "location" {
   type        = string
   default     = "West India"

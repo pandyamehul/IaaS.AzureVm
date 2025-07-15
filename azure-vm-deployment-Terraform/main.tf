@@ -39,8 +39,8 @@ resource "azurerm_public_ip" "public_ip" {
   name                = "${var.vm_name}-public-ip"
   location            = local.location
   resource_group_name = local.resource_group_name
-  allocation_method   = "Dynamic"
-  sku                 = "Basic"
+  allocation_method   = var.public_ip_allocation_method
+  sku                 = var.public_ip_allocation_method == "Static" ? "Standard" : "Basic"
   tags                = var.tags
 }
 
@@ -122,4 +122,11 @@ resource "null_resource" "vm_state_control" {
     vm_start_after_creation = var.vm_start_after_creation
     vm_name = var.vm_name
   }
+}
+
+# Data source to get the actual public IP address
+data "azurerm_public_ip" "vm_public_ip" {
+  depends_on          = [azurerm_windows_virtual_machine.win11_vm]
+  name                = azurerm_public_ip.public_ip.name
+  resource_group_name = local.resource_group_name
 }

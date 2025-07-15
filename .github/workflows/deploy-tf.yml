@@ -1,9 +1,9 @@
 name: Deploy Windows 11 VM (via Terraform)
 
 on:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
   workflow_dispatch:
     inputs:
       action:
@@ -75,6 +75,39 @@ jobs:
         env:
           TF_LOG: DEBUG
 
+      - name: Wait for VM to be fully running
+        run: |
+          echo "⏳ Waiting for VM to be fully running and IP to be assigned..."
+          sleep 60
+        working-directory: azure-vm-deployment-Terraform
+
+      - name: Get VM IP Address before stopping
+        run: |
+          echo "🔍 Getting VM IP address..."
+          VM_NAME=$(terraform output -raw vm_name 2>/dev/null || echo 'DevWin11Vm')
+          RG_NAME=$(terraform output -raw resource_group_name 2>/dev/null || echo 'mehul02-Learning-Azure')
+          IP_METHOD=$(terraform output -raw public_ip_address_allocation 2>/dev/null || echo 'Dynamic')
+          
+          # Try to get IP from Azure CLI
+          PUBLIC_IP=$(az vm show -d --resource-group "$RG_NAME" --name "$VM_NAME" --query publicIps -o tsv 2>/dev/null || echo "")
+          
+          if [ -z "$PUBLIC_IP" ]; then
+            echo "⚠️  Public IP not yet assigned, checking public IP resource..."
+            PUBLIC_IP=$(az network public-ip show --resource-group "$RG_NAME" --name "${VM_NAME}-public-ip" --query ipAddress -o tsv 2>/dev/null || echo "Not assigned")
+          fi
+          
+          echo "📍 VM Public IP: $PUBLIC_IP"
+          echo "🔧 IP Allocation Method: $IP_METHOD"
+          
+          if [ "$IP_METHOD" = "Dynamic" ] && [ "$PUBLIC_IP" = "Not assigned" ]; then
+            echo "💡 Note: Dynamic IP will be assigned when VM starts"
+            PUBLIC_IP="Will be assigned when VM starts"
+          fi
+          
+          echo "VM_PUBLIC_IP=$PUBLIC_IP" >> $GITHUB_ENV
+          echo "IP_METHOD=$IP_METHOD" >> $GITHUB_ENV
+        working-directory: azure-vm-deployment-Terraform
+
       - name: Output VM IP Address
         run: |
           echo "VM IP Address:"
@@ -88,12 +121,21 @@ jobs:
           echo "  - VM Name: $(terraform output -raw vm_name 2>/dev/null || echo 'Not available')"
           echo "  - Resource Group: $(terraform output -raw resource_group_name 2>/dev/null || echo 'Not available')"
           echo "  - Admin Username: $(terraform output -raw admin_username 2>/dev/null || echo 'Not available')"
-          echo "  - Public IP: $(terraform output -raw public_ip_address 2>/dev/null || echo 'Not available')"
+          echo "  - Public IP: ${VM_PUBLIC_IP:-$(terraform output -raw public_ip_address 2>/dev/null || echo 'Not available')}"
+          echo "  - IP Allocation: ${IP_METHOD:-$(terraform output -raw public_ip_address_allocation 2>/dev/null || echo 'Not available')}"
           echo "  - VM Initial State: $(terraform output -raw vm_initial_state 2>/dev/null || echo 'Not available')"
           echo ""
           echo "💰 VM is created in STOPPED state to save costs!"
-          echo "🔌 Start VM manually when needed: az vm start --resource-group [RG] --name [VM_NAME]"
-          echo "🛑 Stop VM to save costs: az vm deallocate --resource-group [RG] --name [VM_NAME]"
+          
+          if [ "${IP_METHOD:-Dynamic}" = "Dynamic" ]; then
+            echo "💡 Dynamic IP: Only charged when VM is running (~$2.40/month when active)"
+            echo "🔌 Start VM to get IP: az vm start --resource-group $(terraform output -raw resource_group_name 2>/dev/null) --name $(terraform output -raw vm_name 2>/dev/null)"
+          else
+            echo "💡 Static IP: Always charged (~$3.65/month) but IP is reserved"
+            echo "🔌 Start VM: az vm start --resource-group $(terraform output -raw resource_group_name 2>/dev/null) --name $(terraform output -raw vm_name 2>/dev/null)"
+          fi
+          
+          echo "🛑 Stop VM to save costs: az vm deallocate --resource-group $(terraform output -raw resource_group_name 2>/dev/null) --name $(terraform output -raw vm_name 2>/dev/null)"
           echo "🔧 Use the 'Destroy' workflow or manual workflow dispatch with 'destroy' action to clean up"
         working-directory: azure-vm-deployment-Terraform
 
