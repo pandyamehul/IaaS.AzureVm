@@ -14,6 +14,12 @@ variable "admin_username" {
   description = "vmadmin"
 }
 
+variable "admin_password" {
+  type        = string
+  description = ""
+  sensitive   = true
+}
+
 variable "tags" {
   type        = map(string)
   description = "Tags to apply to all resources"
