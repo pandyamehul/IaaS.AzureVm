@@ -105,6 +105,6 @@ resource "azurerm_windows_virtual_machine" "win11_vm" {
     version   = "latest"
   }
 
-  enable_automatic_updates = false
+  enable_automatic_updates = true
   tags = var.tags
 }
