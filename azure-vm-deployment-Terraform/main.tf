@@ -21,7 +21,7 @@ locals {
 }
 
 resource "azurerm_virtual_network" "vnet" {
-  name                = "vm-vnet"
+  name                = "${var.vm_name}-vnet"
   address_space       = ["10.0.0.0/16"]
   location            = local.location
   resource_group_name = local.resource_group_name
@@ -29,14 +29,14 @@ resource "azurerm_virtual_network" "vnet" {
 }
 
 resource "azurerm_subnet" "subnet" {
-  name                 = "vm-subnet"
+  name                 = "${var.vm_name}-subnet"
   resource_group_name  = local.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
 resource "azurerm_public_ip" "public_ip" {
-  name                = "vm-public-ip"
+  name                = "${var.vm_name}-public-ip"
   location            = local.location
   resource_group_name = local.resource_group_name
   allocation_method   = "Dynamic"
@@ -45,7 +45,7 @@ resource "azurerm_public_ip" "public_ip" {
 }
 
 resource "azurerm_network_interface" "nic" {
-  name                = "vm-nic"
+  name                = "${var.vm_name}-nic"
   location            = local.location
   resource_group_name = local.resource_group_name
 
@@ -60,7 +60,7 @@ resource "azurerm_network_interface" "nic" {
 }
 
 resource "azurerm_network_security_group" "nsg" {
-  name                = "vm-nsg"
+  name                = "${var.vm_name}-nsg"
   location            = local.location
   resource_group_name = local.resource_group_name
 
@@ -85,7 +85,7 @@ resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
 }
 
 resource "azurerm_windows_virtual_machine" "win11_vm" {
-  name                = "win11-24h2-pro"
+  name                = var.vm_name
   resource_group_name = local.resource_group_name
   location            = local.location
   size                = "Standard_B2ms"
