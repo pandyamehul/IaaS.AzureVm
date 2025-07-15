@@ -9,6 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -41,7 +42,7 @@ jobs:
           echo "Execution time: ${duration} seconds"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve -var-file="terraform.tfvars"
+        run: terraform apply -auto-approve -input=false -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
@@ -49,6 +50,7 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           TF_VAR_admin_password: ${{ secrets.TF_VAR_admin_password }}
+          TF_LOG: DEBUG
 
       - name: Output VM IP Address
         run: |
