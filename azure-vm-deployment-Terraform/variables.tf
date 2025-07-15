@@ -3,6 +3,12 @@ variable "resource_group_name" {
   description = "mehul02-Learning-Azure"
 }
 
+variable "use_existing_resource_group" {
+  type        = bool
+  description = "Whether to use an existing resource group or create a new one"
+  default     = true
+}
+
 variable "location" {
   type        = string
   default     = "West India"

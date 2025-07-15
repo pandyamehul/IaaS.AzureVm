@@ -39,14 +39,16 @@ jobs:
         run: terraform plan -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
 
-      - name: Start timer
-        run: echo "start_time=$(date +%s)" >> $GITHUB_ENV
-
-      - name: Log duration
+      - name: Handle existing resource group
         run: |
-          end_time=$(date +%s)
-          duration=$((end_time - start_time))
-          echo "Execution time: ${duration} seconds"
+          # Check if resource group exists in state
+          if ! terraform state list | grep -q "azurerm_resource_group.rg"; then
+            echo "Resource group not in state, will use existing one"
+          else
+            echo "Resource group already managed by Terraform"
+          fi
+        working-directory: azure-vm-deployment-Terraform
+        continue-on-error: true
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false -var-file="terraform.tfvars"

@@ -2,31 +2,43 @@ provider "azurerm" {
   features {}
 }
 
+# Try to use existing resource group, create if it doesn't exist
+data "azurerm_resource_group" "existing_rg" {
+  name = var.resource_group_name
+  count = var.use_existing_resource_group ? 1 : 0
+}
+
 resource "azurerm_resource_group" "rg" {
+  count    = var.use_existing_resource_group ? 0 : 1
   name     = var.resource_group_name
   location = var.location
   tags     = var.tags
 }
 
+locals {
+  resource_group_name = var.use_existing_resource_group ? data.azurerm_resource_group.existing_rg[0].name : azurerm_resource_group.rg[0].name
+  location = var.use_existing_resource_group ? data.azurerm_resource_group.existing_rg[0].location : azurerm_resource_group.rg[0].location
+}
+
 resource "azurerm_virtual_network" "vnet" {
   name                = "vm-vnet"
   address_space       = ["10.0.0.0/16"]
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
   tags                = var.tags
 }
 
 resource "azurerm_subnet" "subnet" {
   name                 = "vm-subnet"
-  resource_group_name  = azurerm_resource_group.rg.name
+  resource_group_name  = local.resource_group_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
 resource "azurerm_public_ip" "public_ip" {
   name                = "vm-public-ip"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
   allocation_method   = "Dynamic"
   sku                 = "Basic"
   tags                = var.tags
@@ -34,8 +46,8 @@ resource "azurerm_public_ip" "public_ip" {
 
 resource "azurerm_network_interface" "nic" {
   name                = "vm-nic"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
 
   ip_configuration {
     name                          = "internal"
@@ -49,8 +61,8 @@ resource "azurerm_network_interface" "nic" {
 
 resource "azurerm_network_security_group" "nsg" {
   name                = "vm-nsg"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = local.location
+  resource_group_name = local.resource_group_name
 
   security_rule {
     name                       = "RDP"
@@ -74,8 +86,8 @@ resource "azurerm_network_interface_security_group_association" "nsg_assoc" {
 
 resource "azurerm_windows_virtual_machine" "win11_vm" {
   name                = "win11-24h2-pro"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = var.location
+  resource_group_name = local.resource_group_name
+  location            = local.location
   size                = "Standard_B2ms"
   admin_username      = var.admin_username
   admin_password      = var.admin_password
