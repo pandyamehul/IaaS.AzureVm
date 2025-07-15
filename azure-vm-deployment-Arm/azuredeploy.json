@@ -238,7 +238,7 @@
         },
         "publicIPAddress": {
             "type": "string",
-            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))).properties.ipAddress]"
+            "value": "[if(and(equals(parameters('publicIPAllocationMethod'), 'Dynamic'), not(parameters('vmStartAfterCreation'))), 'Not assigned (Dynamic IP - start VM to get IP)', reference(resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName')), '2023-05-01').ipAddress)]"
         },
         "publicIPAllocationMethod": {
             "type": "string",
