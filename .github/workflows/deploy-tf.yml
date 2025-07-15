@@ -2,8 +2,8 @@ name: Deploy Windows 11 VM (via Terraform)
 
 on:
   push:
-    branches:
-      - main
+    # branches:
+    #   - main
   workflow_dispatch:
 
 jobs:
@@ -30,6 +30,15 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -var-file="terraform.tfvars"
         working-directory: azure-vm-deployment-Terraform
+
+      - name: Start timer
+        run: echo "start_time=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Log duration
+        run: |
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          echo "Execution time: ${duration} seconds"
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -var-file="terraform.tfvars"
