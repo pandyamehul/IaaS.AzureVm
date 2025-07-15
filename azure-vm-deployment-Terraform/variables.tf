@@ -15,6 +15,12 @@ variable "vm_name" {
   default     = "DevWin11Vm"
 }
 
+variable "vm_start_after_creation" {
+  type        = bool
+  description = "Whether to start the VM after creation (false = VM will be in stopped state)"
+  default     = false
+}
+
 variable "location" {
   type        = string
   default     = "West India"

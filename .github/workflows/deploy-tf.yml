@@ -2,14 +2,28 @@ name: Deploy Windows 11 VM (via Terraform)
 
 on:
   push:
-    # branches:
-    #   - main
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      action:
+        description: 'Choose action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - destroy
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm resource deletion (only for destroy action)'
+        required: false
+        default: ''
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy')
     
     env:
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
@@ -26,6 +40,11 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.0
+
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
 
       - name: Terraform Init
         run: terraform init
@@ -61,3 +80,81 @@ jobs:
           echo "VM IP Address:"
           terraform output -raw public_ip_address || echo "No public IP address found"
         working-directory: azure-vm-deployment-Terraform
+
+      - name: Output VM Details
+        run: |
+          echo "🎉 VM Deployment Complete!"
+          echo "📋 VM Details:"
+          echo "  - VM Name: $(terraform output -raw vm_name 2>/dev/null || echo 'Not available')"
+          echo "  - Resource Group: $(terraform output -raw resource_group_name 2>/dev/null || echo 'Not available')"
+          echo "  - Admin Username: $(terraform output -raw admin_username 2>/dev/null || echo 'Not available')"
+          echo "  - Public IP: $(terraform output -raw public_ip_address 2>/dev/null || echo 'Not available')"
+          echo "  - VM Initial State: $(terraform output -raw vm_initial_state 2>/dev/null || echo 'Not available')"
+          echo ""
+          echo "💰 VM is created in STOPPED state to save costs!"
+          echo "🔌 Start VM manually when needed: az vm start --resource-group [RG] --name [VM_NAME]"
+          echo "🛑 Stop VM to save costs: az vm deallocate --resource-group [RG] --name [VM_NAME]"
+          echo "🔧 Use the 'Destroy' workflow or manual workflow dispatch with 'destroy' action to clean up"
+        working-directory: azure-vm-deployment-Terraform
+
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Validate destroy confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "❌ Destroy confirmation not provided. You must type 'DESTROY' to proceed."
+            exit 1
+          fi
+          echo "✅ Destroy confirmation validated"
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: azure-vm-deployment-Terraform
+
+      - name: Show resources to be destroyed
+        run: |
+          echo "📋 Resources that will be destroyed:"
+          terraform plan -destroy -var-file="terraform.tfvars"
+        working-directory: azure-vm-deployment-Terraform
+
+      - name: Wait for final confirmation
+        run: |
+          echo "⏳ Waiting 30 seconds before destruction..."
+          echo "🚨 This will permanently delete all resources!"
+          sleep 30
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -var-file="terraform.tfvars"
+        working-directory: azure-vm-deployment-Terraform
+        env:
+          TF_LOG: INFO
+
+      - name: Cleanup confirmation
+        run: |
+          echo "🎉 Resources have been successfully destroyed!"
+          echo "💰 This should help reduce your Azure costs."
+          echo "📊 Check your Azure portal to confirm all resources are deleted."

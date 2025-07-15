@@ -1,0 +1,79 @@
+name: Destroy Windows 11 VM (via Terraform)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm resource deletion'
+        required: true
+        default: ''
+      resource_group_name:
+        description: 'Resource group name to destroy (optional - will use terraform.tfvars if empty)'
+        required: false
+        default: ''
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    env:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_password: ${{ secrets.TF_VAR_ADMIN_PASSWORD }}
+
+    steps:
+      - name: Validate destroy confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "❌ Destroy confirmation not provided. You must type 'DESTROY' to proceed."
+            exit 1
+          fi
+          echo "✅ Destroy confirmation validated"
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Azure CLI Login
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: azure-vm-deployment-Terraform
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: azure-vm-deployment-Terraform
+
+      - name: Show resources to be destroyed
+        run: |
+          echo "📋 Resources that will be destroyed:"
+          terraform plan -destroy -var-file="terraform.tfvars"
+        working-directory: azure-vm-deployment-Terraform
+
+      - name: Wait for manual confirmation
+        run: |
+          echo "⏳ Waiting 30 seconds before destruction..."
+          echo "🚨 This will permanently delete all resources!"
+          sleep 30
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -var-file="terraform.tfvars"
+        working-directory: azure-vm-deployment-Terraform
+        env:
+          TF_LOG: INFO
+
+      - name: Cleanup confirmation
+        run: |
+          echo "🎉 Resources have been successfully destroyed!"
+          echo "💰 This should help reduce your Azure costs."
+          echo "📊 Check your Azure portal to confirm all resources are deleted."

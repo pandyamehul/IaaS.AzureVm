@@ -108,3 +108,18 @@ resource "azurerm_windows_virtual_machine" "win11_vm" {
   enable_automatic_updates = true
   tags = var.tags
 }
+
+# VM shutdown resource to control initial state
+resource "null_resource" "vm_state_control" {
+  depends_on = [azurerm_windows_virtual_machine.win11_vm]
+
+  provisioner "local-exec" {
+    command = var.vm_start_after_creation ? "echo 'VM will remain in running state'" : "az vm deallocate --resource-group ${local.resource_group_name} --name ${var.vm_name}"
+  }
+
+  # Re-run if vm_start_after_creation changes
+  triggers = {
+    vm_start_after_creation = var.vm_start_after_creation
+    vm_name = var.vm_name
+  }
+}
