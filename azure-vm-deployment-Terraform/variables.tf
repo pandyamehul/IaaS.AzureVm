@@ -11,8 +11,8 @@ variable "use_existing_resource_group" {
 
 variable "vm_name" {
   type        = string
-  description = "Name of the virtual machine (used as prefix for associated resources)"
-  default     = "win11-vm"
+  description = "Name of the virtual machine (used as prefix for associated resources) like DevWin11Vm_24h2pro"
+  default     = "DevWin11Vm"
 }
 
 variable "location" {
