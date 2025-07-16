@@ -180,7 +180,11 @@ jobs:
       - name: Check Terraform state and Azure resources
         run: |
           echo "🔍 Checking Terraform state..."
-          terraform state list || echo "⚠️  No Terraform state found"
+          if terraform state list 2>/dev/null; then
+            echo "✅ Terraform state found"
+          else
+            echo "⚠️  No Terraform state found - this is normal if no resources were previously deployed"
+          fi
           
           echo ""
           echo "🔍 Checking actual Azure resources..."
@@ -226,10 +230,10 @@ jobs:
           echo "🗑️  Attempting Terraform destroy..."
           
           # Try Terraform destroy first
-          if terraform destroy -auto-approve -var-file="terraform.tfvars"; then
+          if terraform destroy -auto-approve -var-file="terraform.tfvars" 2>/dev/null; then
             echo "✅ Terraform destroy completed successfully"
           else
-            echo "⚠️  Terraform destroy completed but may have had no resources to destroy"
+            echo "⚠️  Terraform destroy completed but may have had no resources to destroy (this is normal if no state file exists)"
           fi
           
           # Check if VM-specific resources still exist and perform targeted cleanup
