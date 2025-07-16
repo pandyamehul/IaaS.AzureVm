@@ -93,7 +93,7 @@ jobs:
           
           if [ -z "$PUBLIC_IP" ]; then
             echo "⚠️  Public IP not yet assigned, checking public IP resource..."
-            PUBLIC_IP=$(az network public-ip show --resource-group "$RG_NAME" --name "${VM_NAME}-public-ip" --query ipAddress -o tsv 2>/dev/null || echo "Not assigned")
+            PUBLIC_IP=$(az network.public-ip show --resource-group "$RG_NAME" --name "${VM_NAME}-public-ip" --query ipAddress -o tsv 2>/dev/null || echo "Not assigned")
           fi
           
           echo "📍 VM Public IP: $PUBLIC_IP"
@@ -216,7 +216,7 @@ jobs:
           
           echo ""
           echo "📋 Terraform plan for destruction:"
-          terraform plan -destroy -var-file="terraform.tfvars"
+          terraform plan -destroy -var-file="terraform.tfvars" 2>/dev/null || echo "⚠️  No Terraform plan available (no state file found)"
         working-directory: azure-vm-deployment-Terraform
 
       - name: Wait for final confirmation
@@ -252,27 +252,33 @@ jobs:
             if [ "$VM_EXISTS" = "true" ]; then
               echo "⚠️  VM '$VM_NAME' still exists, performing targeted cleanup..."
               
-              # Delete VM and associated resources in proper order
-              echo "�️  Deleting Virtual Machine '$VM_NAME'..."
-              az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes || echo "⚠️  VM deletion failed"
-
-              echo "💽 Deleting OS Disk..."
-              # Get the actual OS disk name for the VM
+              # Get the OS disk name BEFORE deleting the VM
+              echo "🔍 Getting OS Disk name before VM deletion..."
               OS_DISK_NAME=$(az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --query "storageProfile.osDisk.name" -o tsv 2>/dev/null)
               if [ -n "$OS_DISK_NAME" ]; then
                 echo "🔍 Found OS Disk: $OS_DISK_NAME"
-                az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$OS_DISK_NAME" --yes || echo "⚠️  OS Disk deletion failed"
               else
                 echo "⚠️  Could not find OS Disk name, trying fallback pattern..."
                 # Fallback: try to find disk with VM name pattern
-                DISK_NAME=$(az disk list --resource-group "$RESOURCE_GROUP_NAME" --query "[?contains(name, '$VM_NAME')].name" -o tsv 2>/dev/null | head -1)
-                if [ -n "$DISK_NAME" ]; then
-                  echo "🔍 Found disk: $DISK_NAME"
-                  az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$DISK_NAME" --yes || echo "⚠️  OS Disk deletion failed"
+                OS_DISK_NAME=$(az disk list --resource-group "$RESOURCE_GROUP_NAME" --query "[?contains(name, '$VM_NAME')].name" -o tsv 2>/dev/null | head -1)
+                if [ -n "$OS_DISK_NAME" ]; then
+                  echo "🔍 Found disk: $OS_DISK_NAME"
                 else
-                  echo "⚠️  No OS disk found to delete"
+                  echo "⚠️  No OS disk found"
                 fi
-              fi              
+              fi
+              
+              # Delete VM first
+              echo "🖥️  Deleting Virtual Machine '$VM_NAME'..."
+              az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes || echo "⚠️  VM deletion failed"
+
+              # Delete OS Disk using the name we found earlier
+              if [ -n "$OS_DISK_NAME" ]; then
+                echo "💽 Deleting OS Disk '$OS_DISK_NAME'..."
+                az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$OS_DISK_NAME" --yes || echo "⚠️  OS Disk deletion failed"
+              else
+                echo "⚠️  Skipping OS disk deletion - disk name not found"
+              fi
               
               echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
               az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" || echo "⚠️  NIC deletion failed"

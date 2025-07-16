@@ -75,6 +75,11 @@ echo.
 
 REM Delete VM first
 echo 🖥️  Deleting Virtual Machine '%VM_NAME%'...
+
+REM Get the actual OS disk name before deleting the VM
+echo 🔍 Getting OS Disk name before VM deletion...
+for /f "tokens=*" %%i in ('az vm show --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%" --query "storageProfile.osDisk.name" -o tsv 2^>nul') do set "OS_DISK_NAME=%%i"
+
 az vm delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%" --yes
 if %errorlevel% neq 0 (
     echo ❌ Failed to delete VM
@@ -83,12 +88,24 @@ if %errorlevel% neq 0 (
 )
 
 REM Delete OS Disk
-echo 💽 Deleting OS Disk '%VM_NAME%-os-disk'...
-az disk delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-os-disk" --yes
-if %errorlevel% neq 0 (
-    echo ❌ Failed to delete OS Disk
+echo 💽 Deleting OS Disk...
+if defined OS_DISK_NAME (
+    echo 🔍 Found OS Disk: %OS_DISK_NAME%
+    az disk delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%OS_DISK_NAME%" --yes
+    if %errorlevel% neq 0 (
+        echo ❌ Failed to delete OS Disk
+    ) else (
+        echo ✅ OS Disk deleted successfully
+    )
 ) else (
-    echo ✅ OS Disk deleted successfully
+    echo ⚠️  Could not find OS Disk name, trying fallback pattern...
+    echo 💽 Deleting OS Disk '%VM_NAME%-os-disk'...
+    az disk delete --resource-group "%RESOURCE_GROUP_NAME%" --name "%VM_NAME%-os-disk" --yes
+    if %errorlevel% neq 0 (
+        echo ❌ Failed to delete OS Disk
+    ) else (
+        echo ✅ OS Disk deleted successfully
+    )
 )
 
 REM Delete Network Interface

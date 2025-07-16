@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_destroy:
-        description: 'Type "DESTROY" to confirm resource deletion'
+        description: 'Type "DESTROY" to confirm resource deletion (only for destroy action)'
         required: true
         default: ''
       resource_group_name:
@@ -136,23 +136,8 @@ jobs:
               echo "�️  Deleting Virtual Machine '$VM_NAME'..."
               az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes || echo "⚠️  VM deletion failed"
               
-              echo "💽 Deleting OS Disk..."
-              # Get the actual OS disk name for the VM
-              OS_DISK_NAME=$(az vm show --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --query "storageProfile.osDisk.name" -o tsv 2>/dev/null)
-              if [ -n "$OS_DISK_NAME" ]; then
-                echo "🔍 Found OS Disk: $OS_DISK_NAME"
-                az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$OS_DISK_NAME" --yes || echo "⚠️  OS Disk deletion failed"
-              else
-                echo "⚠️  Could not find OS Disk name, trying fallback pattern..."
-                # Fallback: try to find disk with VM name pattern
-                DISK_NAME=$(az disk list --resource-group "$RESOURCE_GROUP_NAME" --query "[?contains(name, '$VM_NAME')].name" -o tsv 2>/dev/null | head -1)
-                if [ -n "$DISK_NAME" ]; then
-                  echo "🔍 Found disk: $DISK_NAME"
-                  az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$DISK_NAME" --yes || echo "⚠️  OS Disk deletion failed"
-                else
-                  echo "⚠️  No OS disk found to delete"
-                fi
-              fi
+              echo "💽 Deleting OS Disk '$VM_NAME-os-disk'..."
+              az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-os-disk" --yes || echo "⚠️  OS Disk deletion failed"
 
               echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
               az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" || echo "⚠️  NIC deletion failed"
