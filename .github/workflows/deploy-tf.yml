@@ -251,6 +251,9 @@ jobs:
               # Delete VM and associated resources in proper order
               echo "�️  Deleting Virtual Machine '$VM_NAME'..."
               az vm delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME" --yes || echo "⚠️  VM deletion failed"
+
+              echo "💽 Deleting OS Disk '$VM_NAME-os-disk'..."
+              az disk delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-os-disk" --yes || echo "⚠️  OS Disk deletion failed"              
               
               echo "🔌 Deleting Network Interface '$VM_NAME-nic'..."
               az network nic delete --resource-group "$RESOURCE_GROUP_NAME" --name "$VM_NAME-nic" || echo "⚠️  NIC deletion failed"
