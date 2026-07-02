@@ -88,7 +88,7 @@ resource "azurerm_windows_virtual_machine" "win11_vm" {
   name                = var.vm_name
   resource_group_name = local.resource_group_name
   location            = local.location
-  size                = "Standard_B2ms"
+  size                = "Standard_B2m"
   admin_username      = var.admin_username
   admin_password      = var.admin_password
   network_interface_ids = [azurerm_network_interface.nic.id]
