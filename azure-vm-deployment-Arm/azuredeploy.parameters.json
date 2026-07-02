@@ -9,10 +9,10 @@
             "value": "vmadmin"
         },
         "vmSize": {
-            "value": "Standard_B2ms"
+            "value": "Standard_B2m"
         },
         "location": {
-            "value": "West India"
+            "value": "Denmark East"
         },
         "publicIPAllocationMethod": {
             "value": "Dynamic"
