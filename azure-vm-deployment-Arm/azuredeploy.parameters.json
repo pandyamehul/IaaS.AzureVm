@@ -9,7 +9,7 @@
             "value": "vmadmin"
         },
         "vmSize": {
-            "value": "Standard_B2m"
+            "value": "Standard_B2s"
         },
         "location": {
             "value": "West India"
