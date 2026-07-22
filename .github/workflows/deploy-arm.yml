@@ -1,5 +1,8 @@
 name: Deploy Windows 11 VM (via ARM Templates)
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
