@@ -1,5 +1,8 @@
 name: Deploy Windows 11 VM (via Terraform)
 
+permissions:
+  contents: read
+
 on:
   # push:
   #   branches:
